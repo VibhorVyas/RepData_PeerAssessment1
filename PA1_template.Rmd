@@ -1,25 +1,133 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_template.Rmd"
+author: "VibhorVyas"
+date: "October 31, 2017"
+output: html_document
+keep_md: true
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
 ## Loading and preprocessing the data
+```{r}
+library(ggplot2)
+library(plyr)
+activity <- read.csv("activity.csv")
+```
+##Processing the Data
 
-
-
+```{r}
+activity$day <- weekdays(as.Date(activity$date))
+activity$DateTime<- as.POSIXct(activity$date, format="%Y-%m-%d")
+```
+##pulling data without nas
+```{r}
+clean <- activity[!is.na(activity$steps),]
+```
 ## What is mean total number of steps taken per day?
 
-
-
+## summarizing total steps per date
+```{r}
+sumTable <- aggregate(activity$steps ~ activity$date, FUN=sum, )
+colnames(sumTable)<- c("Date", "Steps")
+```
+## Creating the historgram of total steps per day
+```{r}
+hist(sumTable$Steps, breaks=5, xlab="Steps", main = "Total Steps per Day")
+```
+## Mean of Steps
+```{r}
+as.integer(mean(sumTable$Steps))
+```
+## Median of Steps
+```{r}
+as.integer(median(sumTable$Steps))
+```
 ## What is the average daily activity pattern?
-
-
-
+```{r}
+library(plyr)
+library(ggplot2)
+```
+##pulling data without nas
+```{r}
+clean <- activity[!is.na(activity$steps),]
+```
+##create average number of steps per interval
+```{r}
+intervalTable <- ddply(clean, .(interval), summarize, Avg = mean(steps))
+```
+##Create line plot of average number of steps per interval
+```{r}
+p <- ggplot(intervalTable, aes(x=interval, y=Avg), xlab = "Interval", ylab="Average Number of Steps")
+p + geom_line()+xlab("Interval")+ylab("Average Number of Steps")+ggtitle("Average Number of Steps per Interval")
+```
+##Maximum steps by interval
+```{r}
+maxSteps <- max(intervalTable$Avg)
+```
+##Which interval contains the maximum average number of steps
+```{r}
+intervalTable[intervalTable$Avg==maxSteps,1]
+```
 ## Imputing missing values
 
-
-
+##Number of NAs in original data set
+```{r}
+nrow(activity[is.na(activity$steps),])
+```
+## Create the average number of steps per weekday and interval
+```{r}
+avgTable <- ddply(clean, .(interval, day), summarize, Avg = mean(steps))
+```
+## Create dataset with all NAs for substitution
+```{r}
+nadata<- activity[is.na(activity$steps),]
+```
+## Merge NA data with average weekday interval for substitution
+```{r}
+newdata<-merge(nadata, avgTable, by=c("interval", "day"))
+```
+## Reorder the new substituded data in the same format as clean data set
+```{r}
+newdata2<- newdata[,c(6,4,1,2,5)]
+colnames(newdata2)<- c("steps", "date", "interval", "day", "DateTime")
+```
+##Merge the NA averages and non NA data together
+```{r}
+mergeData <- rbind(clean, newdata2)
+```
+##Create sum of steps per date to compare with step 1
+```{r}
+sumTable2 <- aggregate(mergeData$steps ~ mergeData$date, FUN=sum, )
+colnames(sumTable2)<- c("Date", "Steps")
+```
+## Mean of Steps with NA data taken care of
+```{r}
+as.integer(mean(sumTable2$Steps))
+```
+## Median of Steps with NA data taken care of
+```{r}
+as.integer(median(sumTable2$Steps))
+```
+## Creating the histogram of total steps per day, categorized by data set to show impact
+```{r}
+hist(sumTable2$Steps, breaks=5, xlab="Steps", main = "Total Steps per Day with NAs Fixed", col="Black")
+hist(sumTable$Steps, breaks=5, xlab="Steps", main = "Total Steps per Day with NAs Fixed", col="Red", add=T)
+legend("topright", c("Imputed Data", "Non-NA Data"), fill=c("black", "red") )
+```
 ## Are there differences in activity patterns between weekdays and weekends?
+
+## Create new category based on the days of the week
+```{r}
+mergeData$DayCategory <- ifelse(mergeData$day %in% c("Saturday", "Sunday"), "Weekend", "Weekday")
+library(lattice) 
+## Summarize data by interval and type of day
+intervalTable2 <- ddply(mergeData, .(interval, DayCategory), summarize, Avg = mean(steps))
+
+##Plot data in a panel plot
+xyplot(Avg~interval|DayCategory, data=intervalTable2, type="l",  layout = c(1,2),
+       main="Average Steps per Interval Based on Type of Day", 
+       ylab="Average Number of Steps", xlab="Interval")
+```
